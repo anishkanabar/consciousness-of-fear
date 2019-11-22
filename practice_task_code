@@ -1,0 +1,323 @@
+% Practice for the fMRI experiment
+% Anish Kanabar 10.7.2019
+
+% Run WinJoystickMex(0) to calibrate dial (needs to equal 0)
+
+function CoF_LIFUP_Practice()
+    
+    %Screen('Preference', 'SkipSyncTests', 1)
+    
+    % Initialize shocker and SCR--------------
+    DaqIndex = Setup_DAQ();
+
+    % DAQ Port A Channels (shocker)
+    ShockSubjectCh = 7;   % Channel corresponding to sending shock.
+
+    % DAQ Port B Channels (SCR)
+    SCRStart = 7; % Channel corresponding to recording shock onset
+    SCREnd = 6;
+
+    % Setup DAQ trigger codes.
+    TriggerCodeA = zeros(1,8);
+    TriggerCodeB = zeros(1,8);
+    
+    % Open screen
+    windowPtr=Screen('OpenWindow',0);
+    Screen('FillRect',windowPtr,0);
+
+    % Load trial parameters
+    par = dlmread(cd + "\OptSeq\LIFUP_Practice.txt");
+
+    % Display the instructions (any key to advance)
+    for s=1:6
+        image_name = sprintf('I%d.jpg',s);
+        image_path = fullfile(pwd,'LIFUP_Instructions',image_name);
+        img = imread(image_path);
+        image = Screen('MakeTexture', windowPtr, img);
+        Screen('DrawTexture', windowPtr, image)
+        Screen('Flip',windowPtr);
+        WaitSecs(1);
+        KbWait();
+    end
+    
+    cont = 0;
+    while cont ~= 1
+  
+        Screen('TextFont',windowPtr,'Calibri');
+        Screen('TextSize', windowPtr, 40);
+        [w,h]=Screen('WindowSize',0);
+        xc = w/2;
+        yc = h/2;
+        DrawFormattedText(windowPtr, 'Please move the dial around.', 'center', 250,...
+                      [255 255 255], 60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        Screen('Flip',windowPtr);
+        [keyDown,~,keyCode,~] = KbCheck;
+        if keyDown
+            if( find(keyCode) == KbName('c') )
+                cont = 1;
+            end 
+        end
+        
+    end
+    
+    for s=8:13
+        image_name = sprintf('I%d.jpg',s);
+        image_path = fullfile(pwd,'LIFUP_Instructions',image_name);
+        img = imread(image_path);
+        image = Screen('MakeTexture', windowPtr, img);
+        Screen('DrawTexture', windowPtr, image)
+        Screen('Flip',windowPtr);
+        WaitSecs(1);
+        KbWait();
+    end
+    
+    cont = 0;
+    while cont == 0
+        i=1;
+        j=1;
+        k=1;
+        n=1;
+        
+        for n=1:2
+            
+            SendSCRTrigger(DaqIndex);
+            condition = par(n,1)
+            s1 = par(n,2)
+            s2 = par(n,3)
+            DrawStimuli(windowPtr,n,condition,DaqIndex,par,s1,s2);
+            
+        end
+        
+        Screen('Flip',windowPtr,0)
+        Screen('FillRect',windowPtr,0);
+        DrawFormattedText(windowPtr,'Do you want to continue?', 'center','center',255);
+        Screen('Flip',windowPtr,0);
+        KbWait;
+        [keyDown,~,keyCode,~] = KbCheck;
+        if keyDown
+            % Check if y
+            if( find(keyCode) == KbName('y') )
+                cont = 1; 
+            elseif( find(keyCode) == KbName('n') )
+                cont = 0;
+            end
+        end
+        
+    end
+
+    
+    % slide for testing shocker
+    image_name = sprintf('I14.jpg');
+    image_path = fullfile(pwd,'LIFUP_Instructions',image_name);
+    img = imread(image_path);
+    image = Screen('MakeTexture', windowPtr, img);
+    Screen('DrawTexture', windowPtr, image)
+    Screen('Flip',windowPtr);
+    % WaitSecs(1);
+    
+    % test the shocker
+    cont = 0;
+    while cont ~= 1
+        KbWait;
+        [keyDown,~,keyCode,~] = KbCheck;
+        if keyDown
+            if( find(keyCode) == KbName('s') )
+                
+                SendShock(DaqIndex);
+
+            elseif( find(keyCode) == KbName('c') )
+                cont = 1;
+            end
+        end
+    end
+         
+    % show last slide
+    image_name = sprintf('I15.jpg');
+    image_path = fullfile(pwd,'LIFUP_Instructions',image_name);
+    img = imread(image_path);
+    image = Screen('MakeTexture', windowPtr, img);
+    Screen('DrawTexture', windowPtr, image)
+    Screen('Flip',windowPtr);
+    WaitSecs(1);
+    KbWait();
+    
+    for n=3:4
+        
+        SendSCRTrigger(DaqIndex);
+        condition = par(n,1)
+        s1 = par(n,2)
+        s2 = par(n,3)
+        DrawStimuli(windowPtr,n,condition,DaqIndex,par,s1,s2);
+        
+    end
+    save('alldata.mat');
+    Screen('CloseAll');
+end
+
+function DrawStimuli(windowPtr,n,condition,DaqIndex,par,s1,s2)
+    global values;
+    [w,h]=Screen('WindowSize',0);
+    xc = w/2;
+    yc = h/2;
+    tic;
+    t=1;
+    while toc<s1
+Screen('TextFont',windowPtr,'Calibri');
+        Screen(windowPtr,'TextSize',60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        v = WinJoystickMex(0);
+        values(n,t) = v;
+        t=t+1;
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        r = par(n,4);
+        g = par(n,5);
+        b = par(n,6);
+        color = [r g b];
+        Screen('FillOval', windowPtr , color, [xc-150 yc-150 xc+150 yc+150]);
+        Screen('Flip',windowPtr);
+    end
+    if par(n,1) == 2
+        SendShock(DaqIndex)
+    end
+    while toc>s1 && toc<s2
+       Screen('TextFont',windowPtr,'Calibri');
+        Screen(windowPtr,'TextSize',60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        v = WinJoystickMex(0);
+        values(n,t) = v;
+        t=t+1;
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        r = par(n,4);
+        g = par(n,5);
+        b = par(n,6);
+        color = [r g b];
+        Screen('FillOval', windowPtr , color, [xc-150 yc-150 xc+150 yc+150]);
+        Screen('Flip',windowPtr);
+    end
+    if par(n,1) == 2
+        SendShock(DaqIndex)
+    end
+    while toc>s2 && toc<30
+        Screen('TextFont',windowPtr,'Calibri');
+        Screen(windowPtr,'TextSize',60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        v = WinJoystickMex(0);
+        values(n,t) = v;
+        t=t+1;
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        r = par(n,4);
+        g = par(n,5);
+        b = par(n,6);
+        color = [r g b];
+        Screen('FillOval', windowPtr , color, [xc-150 yc-150 xc+150 yc+150]);
+        Screen('Flip',windowPtr);
+    end
+end 
+function DaqIndex = Setup_DAQ()
+
+    % Utility function to setup communication between the MC 1208-FS DAQ device
+    % and the laptop. Uses the built-in Psychtoolbox DAQ commands. Needs to be
+    % run only once, after calibrating the DAQ with the Instacal program.
+
+    %% Find a DAQ if none specified.
+    disp('Searching for device...');
+    DaqList = DaqDeviceIndex();
+
+    if isempty(DaqList)
+       error('No DAQ detected in system!');
+    else
+      disp(['DAQ detected! Index number: ',num2str(DaqList(1))]);
+      DaqIndex = DaqList(1);
+    end
+    
+    %% Configure ports. NOTE: We are only using Port A to communicate
+    % only with the shocker for MRI and the shocker and the MEG for MEG.
+    
+    % Set to output.
+    DaqDConfigPort(DaqIndex, 0, 0); % Calibrate Port A, set to output.
+    DaqDConfigPort(DaqIndex, 1, 0); % Calibrate Port B, set to output.
+
+    %% Set triggers to zero.
+    DaqDOut(DaqIndex, 0, 0); % Turn off all lines.
+    DaqDOut(DaqIndex, 1, 0); % Turn off all lines.
+
+end
+
+function SendTrigger(DaqIndex, TriggerCode, PortIdx)
+    %load('pilot_params.mat'); 
+    %% Set up trigger code.
+    % Reverse trigger code.
+    TriggerCode = fliplr( TriggerCode );
+    % Write string.
+    TriggerCode = strrep(num2str(TriggerCode), ' ', '');
+    % Convert to decimal representation.
+    TriggerCode = bin2dec(TriggerCode);
+    %% Write out.
+    DaqDOut(DaqIndex, PortIdx, TriggerCode);
+end
+
+function SendShock(DaqIndex)
+    ShockSubjectCh = 7;
+    TriggerCodeA = zeros(1,8);
+
+    ShockOnA = TriggerCodeA;
+    ShockOnA(ShockSubjectCh) = 1;
+
+    % Send triggers to DAQ
+    SendTrigger(DaqIndex, TriggerCodeA, 0);
+
+    % Reset Trigger Codes & Turn Off Shock
+    TriggerCodeA = zeros(1, 8);
+
+    SendTrigger(DaqIndex, TriggerCodeA, 0);
+    SendTrigger(DaqIndex, ShockOnA, 0);
+end
+
+function SendSCRTrigger(DaqIndex)
+    SCRStart = 7; 
+    SCREnd = 6;
+
+    % Setup DAQ trigger codes.
+    TriggerCodeB = zeros(1,8);
+
+    ShockOnB = TriggerCodeB;
+    ShockOnB(SCRStart) = 1;
+    ShockOffB = TriggerCodeB;
+    ShockOffB(SCREnd) = 1;
+
+    % Send triggers to DAQ
+    SendTrigger(DaqIndex, TriggerCodeB, 1);
+
+    % Reset Trigger Codes 
+    TriggerCodeB = zeros(1, 8);
+    SendTrigger(DaqIndex, TriggerCodeB, 1);
+    SendTrigger(DaqIndex, ShockOnB, 1);
+
+    SendTrigger(DaqIndex, ShockOffB, 1);
+end
