@@ -1,0 +1,291 @@
+% Version with LIFUP
+% Anish Kanabar 10.3.2019
+
+% run WinJoystickMex(0) to calibrate dial (needs to equal 0)
+
+function CoF_LIFUP()
+
+    subject = input('Enter subject number: ');
+    folderName = cd + "\CoF_LIFUP_" + subject;
+    mkdir(folderName);
+    global values;
+    global times;
+    
+    % Load trial parameters
+    par = dlmread(cd + "\OptSeq\LIFUP.txt");
+    st = GetSecs();
+    
+    i=1;
+    j=1;
+    k=1;
+    
+    % Initialize shocker and SCR--------------
+    DaqIndex = Setup_DAQ();
+
+    % DAQ Port A Channels (shocker)
+    ShockSubjectCh = 7;   % Channel corresponding to sending shock.
+
+    % DAQ Port B Channels (SCR)
+    SCRStart = 7; % Channel corresponding to recording shock onset
+    SCREnd = 6;
+
+    % Setup DAQ trigger codes.
+    TriggerCodeA = zeros(1,8);
+    TriggerCodeB = zeros(1,8);
+    
+    % Open screen
+    windowPtr=Screen('OpenWindow',0);
+    Screen('FillRect',windowPtr,0);
+    
+    % Draw fixation cross
+    [w,h]=Screen('WindowSize',0);
+    xc = w/2;
+    yc = h/2;
+    Screen('DrawLine',windowPtr,255,xc-20,yc,xc+20,yc,4);
+    Screen('DrawLine',windowPtr,255,xc,yc-20,xc,yc+20,4);
+    Screen('Flip',windowPtr,0)
+    
+    while 1
+        [keyDown,~,keyCode] = KbCheck;
+        if keyDown
+            % Key is down; check to see if equals sign.
+            if( find(keyCode) == KbName('c') )
+                break
+            
+            elseif( find(keyCode) == KbName('s') )
+                SendShock(DaqIndex);
+            end
+        end
+    end
+    
+    while 1
+        Screen('TextFont',windowPtr,'Calibri');
+        Screen('TextSize', windowPtr, 40);
+        DrawFormattedText(windowPtr, 'Please move the dial all the way to the right \n then all the way to the left.', 'center', 250,...
+                      [255 255 255], 60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        Screen('Flip',windowPtr);
+        %KbWait;
+        [keyDown,~,keyCode,~] = KbCheck;
+        if keyDown
+            if( find(keyCode) == KbName('w') )
+                break;
+            end 
+        end
+    end
+    
+    try
+        StartTime = WaitForScanner(windowPtr);
+    catch err
+        Screen('CloseAll');
+        ShowCursor();
+        rethrow(err)
+    end
+    
+    for n=1:length(par)
+
+        SendSCRTrigger(DaqIndex);
+        
+        condition = par(n,1)
+        s1 = par(n,2)
+        s2 = par(n,3)
+        DrawStimuli(windowPtr,n,condition,st,DaqIndex,par,s1,s2);
+
+    end
+    v = array2table(values);
+    writetable(v,folderName + "\Values.csv");
+    
+    filename = cd + "\Data\CoF_LIFUP_" + subject + ".mat";
+    save(filename);
+    Screen('CloseAll');
+end
+
+function DrawStimuli(windowPtr,n,condition,st,DaqIndex,par,s1,s2)
+    global values;
+    global times;
+    [w,h]=Screen('WindowSize',0);
+    xc = w/2;
+    yc = h/2;
+    tic;
+    t=1;
+    while toc<s1
+        Screen('TextFont',windowPtr,'Calibri');
+        Screen(windowPtr,'TextSize',60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        v = WinJoystickMex(0);
+        values(n,t) = v;
+        t=t+1;
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        r = par(n,4);
+        g = par(n,5);
+        b = par(n,6);
+        color = [r g b];
+        Screen('FillOval', windowPtr , color, [xc-150 yc-150 xc+150 yc+150]);
+        Screen('Flip',windowPtr);
+        times(n,1) = GetSecs()-st;
+    end
+    if par(n,1) == 2
+        SendShock(DaqIndex)
+    end
+    while toc>s1 && toc<s2
+        Screen('TextFont',windowPtr,'Calibri');
+        Screen(windowPtr,'TextSize',60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        v = WinJoystickMex(0);
+        values(n,t) = v;
+        t=t+1;
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        r = par(n,4);
+        g = par(n,5);
+        b = par(n,6);
+        color = [r g b];
+        Screen('FillOval', windowPtr , color, [xc-150 yc-150 xc+150 yc+150]);
+        Screen('Flip',windowPtr);
+        times(n,2) = GetSecs()-st;
+    end
+    if par(n,1) == 2
+        SendShock(DaqIndex)
+    end
+    while toc>s2 && toc<30
+        Screen('TextFont',windowPtr,'Calibri');
+        Screen(windowPtr,'TextSize',60);
+        x = WinJoystickMex(0)/9.45 + (w/6);
+        v = WinJoystickMex(0);
+        values(n,t) = v;
+        t=t+1;
+        Screen(windowPtr,'TextSize',30);
+        Screen('DrawLine',windowPtr,255,xc-(w/3),yc+250,xc+(w/3),yc+250,2);
+        DrawFormattedText(windowPtr,'0',xc-(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Max',xc+(w/3),yc+315,255);
+        DrawFormattedText(windowPtr,'Anxiety','center',yc+325,255);
+        %draw cursor
+        Screen('DrawLine',windowPtr,255,x,yc+225,x,yc+275,12);
+        r = par(n,4);
+        g = par(n,5);
+        b = par(n,6);
+        color = [r g b];
+        Screen('FillOval', windowPtr , color, [xc-150 yc-150 xc+150 yc+150]);
+        Screen('Flip',windowPtr);
+    end
+end 
+function DaqIndex = Setup_DAQ()
+
+    % Utility function to setup communication between the MC 1208-FS DAQ device
+    % and the laptop. Uses the built-in Psychtoolbox DAQ commands. Needs to be
+    % run only once, after calibrating the DAQ with the Instacal program.
+
+    %% Find a DAQ if none specified.
+    disp('Searching for device...');
+    DaqList = DaqDeviceIndex();
+
+    if isempty(DaqList)
+       error('No DAQ detected in system!');
+    else
+      disp(['DAQ detected! Index number: ',num2str(DaqList(1))]);
+      DaqIndex = DaqList(1);
+    end
+    
+    %% Configure ports. NOTE: We are only using Port A to communicate
+    % only with the shocker for MRI and the shocker and the MEG for MEG.
+    
+    % Set to output.
+    DaqDConfigPort(DaqIndex, 0, 0); % Calibrate Port A, set to output.
+    DaqDConfigPort(DaqIndex, 1, 0); % Calibrate Port B, set to output.
+
+    %% Set triggers to zero.
+    DaqDOut(DaqIndex, 0, 0); % Turn off all lines.
+    DaqDOut(DaqIndex, 1, 0); % Turn off all lines.
+
+end
+
+function SendTrigger(DaqIndex, TriggerCode, PortIdx)
+    %% Set up trigger code.
+    % Reverse trigger code.
+    TriggerCode = fliplr( TriggerCode );
+    % Write string.
+    TriggerCode = strrep(num2str(TriggerCode), ' ', '');
+    % Convert to decimal representation.
+    TriggerCode = bin2dec(TriggerCode);
+    %% Write out.
+    DaqDOut(DaqIndex, PortIdx, TriggerCode);
+end
+
+function SendShock(DaqIndex)
+    ShockSubjectCh = 7;
+    TriggerCodeA = zeros(1,8);
+
+    ShockOnA = TriggerCodeA;
+    ShockOnA(ShockSubjectCh) = 1;
+
+    % Send triggers to DAQ
+    SendTrigger(DaqIndex, TriggerCodeA, 0);
+
+    % Reset Trigger Codes & Turn Off Shock
+    TriggerCodeA = zeros(1, 8);
+
+    SendTrigger(DaqIndex, TriggerCodeA, 0);
+    SendTrigger(DaqIndex, ShockOnA, 0);
+end
+
+function SendSCRTrigger(DaqIndex)
+    SCRStart = 7; 
+    SCREnd = 6;
+
+    % Setup DAQ trigger codes.
+    TriggerCodeB = zeros(1,8);
+
+    ShockOnB = TriggerCodeB;
+    ShockOnB(SCRStart) = 1;
+    ShockOffB = TriggerCodeB;
+    ShockOffB(SCREnd) = 1;
+
+    % Send triggers to DAQ
+    SendTrigger(DaqIndex, TriggerCodeB, 1);
+
+    % Reset Trigger Codes 
+    TriggerCodeB = zeros(1, 8);
+    SendTrigger(DaqIndex, TriggerCodeB, 1);
+    SendTrigger(DaqIndex, ShockOnB, 1);
+
+    SendTrigger(DaqIndex, ShockOffB, 1);
+end
+function StartTime = WaitForScanner(windowPtr)
+
+    WaitText = 'Waiting for scanner...';
+    Screen('TextFont', windowPtr, 'Helvetica');
+    Screen('TextSize', windowPtr, 24);
+    DrawFormattedText(windowPtr, WaitText, 'center', 'center',...
+                      [255 255 255], 60);
+    Screen('Flip',windowPtr);
+
+    while 1
+        [keyDown,~,keyCode] = KbCheck;
+        if (keyDown)
+            if( find(keyCode) == KbName('=+') )
+                StartTime = GetSecs();
+                break
+            elseif( find(keyCode) == KbName('esc') )
+                error('User opted to abort task!')
+            end
+        end
+    end
+end
