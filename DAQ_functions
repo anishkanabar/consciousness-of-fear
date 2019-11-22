@@ -1,0 +1,82 @@
+function DaqIndex = Setup_DAQ()
+
+    disp('Searching for device...');
+    DaqList = DaqDeviceIndex();
+
+    if isempty(DaqList)
+       error('No DAQ detected in system!');
+    else
+      disp(['DAQ detected! Index number: ',num2str(DaqList(1))]);
+      DaqIndex = DaqList(1);
+    end
+    
+    DaqDConfigPort(DaqIndex, 0, 0); % Calibrate Port A, set to output.
+    DaqDConfigPort(DaqIndex, 1, 0); % Calibrate Port B, set to output.
+
+    DaqDOut(DaqIndex, 0, 0); % Turn off all lines.
+    DaqDOut(DaqIndex, 1, 0); % Turn off all lines.
+
+end
+
+function SendTrigger(DaqIndex, TriggerCode, PortIdx)
+    TriggerCode = fliplr( TriggerCode );
+    TriggerCode = strrep(num2str(TriggerCode), ' ', '');
+    TriggerCode = bin2dec(TriggerCode);
+    DaqDOut(DaqIndex, PortIdx, TriggerCode);
+end
+
+function SendShock(DaqIndex)
+    ShockSubjectCh = 7;
+    TriggerCodeA = zeros(1,8);
+
+    ShockOnA = TriggerCodeA;
+    ShockOnA(ShockSubjectCh) = 1;
+
+    SendTrigger(DaqIndex, TriggerCodeA, 0);
+
+    TriggerCodeA = zeros(1, 8);
+
+    SendTrigger(DaqIndex, TriggerCodeA, 0);
+    SendTrigger(DaqIndex, ShockOnA, 0);
+end
+
+function SendSCRTrigger(DaqIndex)
+    SCRStart = 7; 
+    SCREnd = 6;
+    
+    TriggerCodeB = zeros(1,8);
+
+    ShockOnB = TriggerCodeB;
+    ShockOnB(SCRStart) = 1;
+    ShockOffB = TriggerCodeB;
+    ShockOffB(SCREnd) = 1;
+
+    SendTrigger(DaqIndex, TriggerCodeB, 1);
+    
+    TriggerCodeB = zeros(1, 8);
+    SendTrigger(DaqIndex, TriggerCodeB, 1);
+    SendTrigger(DaqIndex, ShockOnB, 1);
+
+    SendTrigger(DaqIndex, ShockOffB, 1);
+end
+function StartTime = WaitForScanner(windowPtr)
+
+    WaitText = 'Waiting for scanner...';
+    Screen('TextFont', windowPtr, 'Helvetica');
+    Screen('TextSize', windowPtr, 24);
+    DrawFormattedText(windowPtr, WaitText, 'center', 'center',...
+                      [255 255 255], 60);
+    Screen('Flip',windowPtr);
+
+    while 1
+        [keyDown,~,keyCode] = KbCheck;
+        if (keyDown)
+            if( find(keyCode) == KbName('=+') )
+                StartTime = GetSecs();
+                break
+            elseif( find(keyCode) == KbName('esc') )
+                error('User opted to abort task!')
+            end
+        end
+    end
+end
